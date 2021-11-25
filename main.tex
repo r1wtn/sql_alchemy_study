@@ -1,0 +1,43 @@
+% command(\UTF{2318}) + option(\UTF{2325}) + b
+% command(\UTF{2318}) + option(\UTF{2325}) + v
+% jlisting.styがないとコンパイルエラーになる。
+\documentclass{jsbook}
+
+\usepackage{color}
+\usepackage{here}
+\usepackage{listings,jlisting}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{amsthm}
+\newtheorem{dfn}{定義}
+\newtheorem{thm}{定理}
+
+\lstset{
+  basicstyle={\ttfamily},
+  identifierstyle={\small},
+  commentstyle={\smallitshape},
+  keywordstyle={\small\bfseries},
+  ndkeywordstyle={\small},
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},
+  numbers=left,
+  xrightmargin=0zw,
+  xleftmargin=3zw,
+  numberstyle={\scriptsize},
+  stepnumber=1,
+  numbersep=1zw,
+  lineskip=-0.5ex
+}
+\setlength{\textwidth}{\fullwidth}
+\setlength{\evensidemargin}{\oddsidemargin}
+
+
+\begin{document}
+
+\input{engine.tex}
+\input{session.tex}
+\input{orm.tex}
+\input{fastapi.tex}
+
+\end{document}

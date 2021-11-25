@@ -1,0 +1,74 @@
+\chapter{Engine}
+\section{用語}
+
+\begin{dfn}
+  \textbf{Dialect}
+\end{dfn}
+
+SQLのDBMS固有のバージョンを指します。
+例えば \textbf{MySQL}と\textbf{PostgreSQL}では文法が違ったりしますが、その仕様を定義したものが Database Dialectになります。
+
+\begin{dfn}\label{dbapi}
+  \textbf{DBAPI}
+\end{dfn}
+PythonからDBMSへの接続するためのインターフェース仕様を定義したものです。
+最新版は PEP 249 -- Python Database API Specification v2.0です。
+ライブラリはこの標準仕様に沿って作成されています。
+
+
+\begin{dfn}
+  \textbf{Driver}
+\end{dfn}
+定義\ref{dbapi}を実装したものの総称です。
+PostgreSQLのドライバの代表的なものは \textbf{pg8000}、
+MySQLであれば \textbf{aiomysql}などがあります。
+
+\begin{dfn}
+  \textbf{Pool}
+\end{dfn}
+コネクションプール。
+長時間稼働する接続をメモリ上に保持して効率的に再利用したり、アプリケーションが同時に使用する接続の総数を管理したりするために使用される標準的な技術です。
+
+
+\section {Engineの役割}
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=12cm]{engine/engine.png}
+\caption{engineの役割}
+\end{center}
+\end{figure}
+
+engineはPoolとDialectオブジェクトを内部に持ち、DBAPIを操作します。
+engineの使い方には２パターンあります。
+\begin{enumerate}
+  \item {engineからSessionを生成して、ORMでDBにアクセスする。}
+  \item {engineから直接SQLを発行する。}
+\end{enumerate}
+
+
+\section{Engineの生成}
+engineは \textbf{create\_engine()}関数に RFC-1738に準拠したデータベースへのURLを与えることで生成できます。
+その仕様は以下の通りです。
+
+\begin{dfn}
+  RFC-1738
+\end{dfn}
+
+dialect+driver://username:password@host:port/database
+\\
+\\
+engineは、生成されたタイミングでDBへの接続を行うわけではないことに注意してください。
+のちに紹介する \textbf{Engine.execute()}や\textbf{ Engine.connect() }が呼ばれたタイミングで初めてDBへの接続が開始されます。
+
+
+\section {コネクションプール}
+
+
+
+\section {Asynchronous I/O (asyncio)}
+\subsection*{注意}
+SQLAlchemy 1.4.3においては非同期接続はベータ版の機能です。
+\subsection {環境設定}
+\begin{lstlisting}[caption=asyncioのインストール]
+  pip install sqlalchemy[asyncio]
+\end{lstlisting}

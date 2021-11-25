@@ -1,0 +1,188 @@
+\chapter{FastAPI}
+
+本章では、WebフレームワークであるFastAPIを利用し、SQLAlchemyの実用例を見ていきます。
+
+\section{用語}
+
+\begin{dfn}
+  \textbf{パス}
+\end{dfn}
+最初の / から始まるURLの最後の部分です。
+
+\begin{dfn}
+  \label{operation}
+  \textbf{オペレーション}
+\end{dfn}
+HTTPメソッドの一つを指します。
+
+\begin{dfn}
+  \textbf{パスオペレーション関数}
+\end{dfn}
+特定のパスに対して要求があったときに実行される関数です。
+
+\begin{dfn}
+  \textbf{モデル}
+\end{dfn}
+ここでは、データベースのテーブルをSQLAlchemyで実装したオブジェクトを指します。
+
+\begin{dfn}
+  \textbf{スキーマ}
+\end{dfn}
+ここでは、Pydanticによって定義されたオブジェクトのことを指します。
+
+
+
+\section{Sessionの注入}
+FastAPIの基本概念であるDendency Injectionを利用して、各パスオペレーション関数にてデータベースを操作するためのSessionを使えるようにします。
+\ref{session.interface}にて述べたように、Sessionはデータベース操作のたびに生成され、処理が終わったら破棄されます。
+この部分を実現するジェネレータ関数を、以下のように定義します。
+
+\begin{lstlisting}[caption=セッションジェネレータ][H]
+# sessionmaker to make Session with api version 2.0 (future)
+Session = sessionmaker(engine, future=True)
+
+# dependency for each api call
+def get_db_session():
+    db = Session()
+    try:
+        yield db
+    finally:
+        db.close()
+\end{lstlisting}
+
+\begin{lstlisting}[caption=パスオペレーション関数][H]
+  @router.get('/get', response_model=List[schema.Group])
+  async def get_groups(request: Request, session: Session = Depends(get_db_session)):
+      stmt = select(Group)
+      groups = session.execute(stmt).scalars().all()
+      return groups
+\end{lstlisting}
+
+Dependsを利用してget\_db\_session関数をパスオペレーションにて呼び出すと、
+呼ばれたときにSessionがインスタンス化されて利用できるようになります。
+そしてレスポンスが返されてsession変数がスコープを抜けると、finallyに定義されたcloseが呼ばれ、sessionが必ず破棄されます。
+
+
+\section{スキーマの定義}
+データベース上の各モデルに対応するスキーマを定義する必要があります。
+スキーマを利用することで、SQLAlchemyのモデルを自動的にMap Objectに変換してレスポンスを返せるようになります。
+例えば、以下のようにLocationというモデルがデータベースに定義されているとします。
+
+\begin{lstlisting}[caption=Location Model]
+class Location(Base):
+  __tablename__ = "locations"
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255))
+  label = Column(String(255))
+  latitude = Column(Float)
+  longitude = Column(Float)
+\end{lstlisting}
+
+これに対応するスキーマは以下のようにかけます。
+
+
+\begin{lstlisting}[caption=Location schema]
+class LocationBase(BaseModel):
+  name: str
+  label: str
+  latitude: Optional[float]
+  longitude: Optional[float]
+
+class LocationCreate(LocationBase):
+  pass
+
+class Location(LocationBase):
+  id: str
+  class Config:
+      orm_mode = True
+\end{lstlisting}
+
+ここで、LocationCreateとLocationを分けているのは、\textbf{リクエストボディで利用するのか}、\textbf{レスポンスボディで利用するのか}によって使い分けるためです。
+まず、リクエストボディとしてLocationのMap Objectが送られてくるようなケースを想定します。
+パスオペレーション関数は次のようになるでしょう。
+
+\begin{lstlisting}[caption=Create New Location]
+@router.post('/post')
+async def post_location(
+    location: schema.LocationCreate,
+    session: Session = Depends(get_db_session)
+):
+    ...
+    return location
+\end{lstlisting}
+
+
+リクエストボディにschema.LocationCreateを定義しています。
+もしこれをschema.Locationに変更するとどうなるでしょうか。
+Locationは、必須フィールドであるidを持っています。
+これはモデルのprimary keyとして設定しているidに対応させるためです。
+通常、idは自動インクリメントで振られるため、ユーザからのリクエストボディに含まれることはありません。
+しかし、これがリクエストボディのスキーマとして与えられてしまうと、idがないためにバリデーションエラーになり、リクエストを受け付けることができません。
+そのため、リクエストボディには専用のLocationCreateスキーマを定義して利用しています。
+ではGETの方はどうでしょうか。
+
+\begin{lstlisting}[caption=Get Location List]
+@router.get('/get', response_model=List[schema.Location])
+async def get_location(request: Request, session: Session = Depends(get_db_session)):
+    stmt = select(Location)
+    locations = session.execute(stmt).scalars().all()
+    return locations
+\end{lstlisting}
+
+
+こちらのURLにアクセスすると、Locationテーブルのデータの配列を全て取得することができます。
+ポイントは、\textbf{response\_model}にLocationスキーマを与えている点です。
+4行目のlocationsは、クエリを発行して得られたlocationモデルの配列です。
+response\_modelを与えることにより、このモデルを自動的にMap objectに変換して返してくれます。
+ポイントは、モデルとスキーマのフィールド定義が完全に一致していることです。
+フィールドの型が異なったり不足するフィールドがあると、バリデーションエラーにより値を返すことができません。
+ちなみに、response\_modelを定義せずにMap Objectを返そうとすると、以下のような感じになります。
+
+\begin{lstlisting}[caption=スキーマを使わないGET]
+@router.get('/get')
+async def get_location(request: Request, session: Session = Depends(get_db_session)):
+    stmt = select(Location)
+    locations = session.execute(stmt).scalars().all()
+    data = []
+    for l in locations:
+        data.append({
+            "id": l.id,
+            "label": l.label,
+            "name": l.name,
+            "latitude": l.latitude,
+            "longitude": l.longitude
+        })
+    return data
+\end{lstlisting}
+
+モデルから必要なフィールドを取り出して、Map Objectに変換したものを配列に詰めて返します。
+
+
+\section{各オペレーションの基本構文}
+この節では、各オペレーション（定義\ref{operation}）における基本的な構文を見ていきます。
+
+\subsection{GET}
+
+\subsubsection*{全てのオブジェクトを取り出す}
+
+\begin{lstlisting}[caption=Get Location List]
+  @router.get('/get', response_model=List[schema.Location])
+  async def get_location(session: Session = Depends(get_db_session)):
+      stmt = select(Location)
+      locations = session.execute(stmt).scalars().all()
+      return locations
+  \end{lstlisting}
+  
+
+\subsubsection*{条件に合致するオブジェクトを取り出す}
+
+\begin{lstlisting}[caption=Get Location on condition]
+  @router.get('/get', response_model=schema.Location)
+  async def get_location(location_id: str, session: Session = Depends(get_db_session)):
+      stmt = select(Location).filter_by(id=location_id)
+      location = session.execute(stmt).scalar_one()
+      return location
+\end{lstlisting}
+
+\subsubsection*{リレーションがある場合}
+

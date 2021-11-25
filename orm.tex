@@ -1,0 +1,42 @@
+\chapter{ORM}
+
+\section{リレーション}
+
+\subsection{多対多}
+
+関連テーブルを作ります。例として、GroupテーブルとLocationテーブルを相互に参照する関係を記述します。
+
+\begin{lstlisting}[caption=多対多]
+GroupLocation = Table('group_location', Base.metadata,
+  Column('group_id', ForeignKey('groups.id'), primary_key=True),
+  Column('location_id', ForeignKey('locations.id'), primary_key=True)
+)
+\end{lstlisting}
+
+各テーブル間のリレーションは \textbf{relation}パラメータを与えることで実現します。
+また、relationship.secondary引数にこの関連テーブルを指定します。
+
+
+
+\begin{lstlisting}[caption=テーブル定義]
+class Group(Base):
+  __tablename__ = "groups"
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255))
+  label = Column(String(255))
+  users = relationship("UserTable", back_populates="group")
+  locations =  relationship(
+      "Location",
+      secondary=GroupLocation,
+      backref="groups")
+
+class Location(Base):
+  __tablename__ = "locations"
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255))
+  label = Column(String(255))
+  latitude = Column(Float)
+  longitude = Column(Float)
+\end{lstlisting}
+
+\textbf{backref}を
