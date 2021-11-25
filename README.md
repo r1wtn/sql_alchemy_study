@@ -1,5 +1,8 @@
 # SQLAlchemyの勉強
 
+[PDFはこちら](https://github.com/r1wtn/sql_alchemy_study/blob/main/out/main.pdf)
+
+
 ## 環境設定
 
 ### VScode設定

@@ -185,4 +185,50 @@ async def get_location(request: Request, session: Session = Depends(get_db_sessi
 \end{lstlisting}
 
 \subsubsection*{リレーションがある場合}
+GroupとLocationが多対多のリレーションを貼っているとします。
+すると、モデル定義は以下のようになります。
+\begin{lstlisting}[caption=モデル定義]
+GroupLocation = Table('group_location', Base.metadata,
+  Column('group_id', ForeignKey('groups.id'), primary_key=True),
+  Column('location_id', ForeignKey('locations.id'), primary_key=True)
+)
 
+class Group(Base):
+  __tablename__ = "groups"
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255))
+  label = Column(String(255))
+  users = relationship("UserTable", back_populates="group")
+  locations =  relationship(
+      "Location",
+      secondary=GroupLocation,
+      backref="groups")
+
+class Location(Base):
+  __tablename__ = "locations"
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255))
+  label = Column(String(255))
+  latitude = Column(Float)
+  longitude = Column(Float)
+\end{lstlisting}
+
+GroupをGETで取り出すと、以下のようになります。
+
+
+
+
+\section{プロジェクトの構成}
+参考までに、FastAPIxSQLAlchemyのプロジェクト構成を載せておきます。
+
+\begin{lstlisting}[caption=プロジェクト構成]
+models/
+  - __init__.py    # ここにmodelの定義をここにします。
+schemas/
+  - __init__.py    # スキーマの定語をここにします。
+routers/
+  - __init__.py    # APIRouterの定義をここにします。
+  - some_router.py
+config.py    # 各種設定値を格納します。
+main.py    # エントリポイント
+\end{lstlisting}
